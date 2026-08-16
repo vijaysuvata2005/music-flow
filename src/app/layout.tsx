@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Music Flow",
   description: "Discover and enjoy your favorite music.",
+  verification: {
+    google: "Gx36PgoAdjk0-PaipeO9zMs3N3ieJxVp3bojoTkvNOQ",
+  },
 };
 
 export default function RootLayout({
