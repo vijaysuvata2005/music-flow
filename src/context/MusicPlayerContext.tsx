@@ -21,6 +21,25 @@ export interface Song {
   createdAt?: string;
 }
 
+interface MusicPlayerContextValue {
+  songs: Song[];
+  currentSong: Song | null;
+  currentIndex: number;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  volume: number;
+
+  playSong: (song: Song) => Promise<void>;
+  togglePlay: () => Promise<void>;
+  nextSong: () => Promise<void>;
+  previousSong: () => Promise<void>;
+  seekSong: (time: number) => void;
+
+  changeVolume: (value: number) => void;
+  toggleMute: () => void;
+}
+
 interface SavedPlayerState {
   songId: string;
   currentTime: number;
@@ -43,41 +62,43 @@ interface MusicPlayerContextType {
   previousSong: () => void;
   nextSong: () => void;
   seekSong: (time: number) => void;
+
   setVolume: (volume: number) => void;
+
+  // Global player compatibility
+  changeVolume: (value: number) => void;
+  toggleMute: () => void;
 }
 
 const MusicPlayerContext =
   createContext<MusicPlayerContextType | null>(null);
 
-const PLAYER_STORAGE_KEY = "musicflow-player-state";
+const PLAYER_STORAGE_KEY =
+  "musicflow-player-state";
 
 export function MusicPlayerProvider({
   children,
 }: {
   children: ReactNode;
 }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef =
+    useRef<HTMLAudioElement | null>(null);
 
-  const playRequestId = useRef(0);
-  const shouldPlayRef = useRef(false);
+  const playRequestId =
+    useRef(0);
 
-  /*
-   * IMPORTANT:
-   *
-   * songs is now treated as a GLOBAL song library.
-   *
-   * Different pages can call setSongs(), but one page
-   * must not remove the songs loaded by another page.
-   */
-  const [songs, setSongsState] = useState<Song[]>([]);
+  const shouldPlayRef =
+    useRef(false);
 
   /*
-   * Store the currently selected song by ID instead of
-   * depending only on an array index.
-   *
-   * This prevents the current song from disappearing
-   * when another page changes its song list.
+   * =========================================
+   * SONGS
+   * =========================================
    */
+
+  const [songs, setSongsState] =
+    useState<Song[]>([]);
+
   const [currentSongId, setCurrentSongId] =
     useState<string | null>(null);
 
@@ -110,13 +131,6 @@ export function MusicPlayerProvider({
         )
       : undefined;
 
-  /*
-   * Current index is calculated from the
-   * current global song.
-   *
-   * This keeps the existing API compatible
-   * with All Songs / Home / other pages.
-   */
   const currentIndex =
     currentSongId
       ? songs.findIndex(
@@ -142,10 +156,6 @@ export function MusicPlayerProvider({
         const savedState: SavedPlayerState =
           JSON.parse(saved);
 
-        /*
-         * Restore only the information that
-         * does not depend on the song list.
-         */
         if (
           typeof savedState.volume ===
           "number"
@@ -163,7 +173,7 @@ export function MusicPlayerProvider({
 
         if (
           typeof savedState.songId ===
-          "string" &&
+            "string" &&
           savedState.songId
         ) {
           setCurrentSongId(
@@ -198,16 +208,20 @@ export function MusicPlayerProvider({
     playing: boolean,
     currentVolume: number
   ) {
-    if (!song) return;
+    if (!song) {
+      return;
+    }
 
     try {
       const state: SavedPlayerState = {
         songId: song.id,
+
         currentTime:
           Number.isFinite(time) &&
           time >= 0
             ? time
             : 0,
+
         volume: Math.max(
           0,
           Math.min(
@@ -215,6 +229,7 @@ export function MusicPlayerProvider({
             currentVolume
           )
         ),
+
         isPlaying: playing,
       };
 
@@ -234,22 +249,6 @@ export function MusicPlayerProvider({
    * =========================================
    * SET SONGS
    * =========================================
-   *
-   * IMPORTANT FIX:
-   *
-   * We MERGE songs instead of replacing the
-   * entire global list.
-   *
-   * Example:
-   *
-   * All Songs -> song A, B, C
-   * Home      -> song A, D
-   *
-   * Result:
-   * A, B, C, D
-   *
-   * Therefore if B was playing and user
-   * goes Home, B is still available globally.
    */
 
   function setSongs(
@@ -260,9 +259,6 @@ export function MusicPlayerProvider({
         const songMap =
           new Map<string, Song>();
 
-        /*
-         * Keep existing songs first.
-         */
         previousSongs.forEach(
           (song) => {
             songMap.set(
@@ -272,10 +268,6 @@ export function MusicPlayerProvider({
           }
         );
 
-        /*
-         * Update/add songs from the
-         * current page.
-         */
         newSongs.forEach(
           (song) => {
             songMap.set(
@@ -299,15 +291,13 @@ export function MusicPlayerProvider({
    */
 
   useEffect(() => {
-    if (!hydrated || !songs.length) {
+    if (
+      !hydrated ||
+      !songs.length
+    ) {
       return;
     }
 
-    /*
-     * If a current song already exists,
-     * NEVER reset it just because another
-     * page loaded another song list.
-     */
     if (currentSongId) {
       const exists =
         songs.some(
@@ -357,11 +347,6 @@ export function MusicPlayerProvider({
         error
       );
     }
-
-    /*
-     * Do NOT automatically select the
-     * first song.
-     */
   }, [
     hydrated,
     songs,
@@ -378,7 +363,9 @@ export function MusicPlayerProvider({
     const audio =
       audioRef.current;
 
-    if (!audio) return;
+    if (!audio) {
+      return;
+    }
 
     const handleTimeUpdate =
       () => {
@@ -500,7 +487,10 @@ export function MusicPlayerProvider({
         setCurrentSongId(
           (currentId) => {
             if (!currentId) {
-              return songs[0]?.id ?? null;
+              return (
+                songs[0]?.id ??
+                null
+              );
             }
 
             const index =
@@ -516,7 +506,8 @@ export function MusicPlayerProvider({
                 songs.length - 1
             ) {
               return (
-                songs[0]?.id ?? null
+                songs[0]?.id ??
+                null
               );
             }
 
@@ -640,13 +631,16 @@ export function MusicPlayerProvider({
     audio.src =
       currentSong.audioUrl;
 
-    audio.volume = volume;
+    audio.volume =
+      volume;
 
     audio.load();
 
     const startPlayback =
       async () => {
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         if (
           requestId !==
@@ -750,13 +744,17 @@ export function MusicPlayerProvider({
       audio.addEventListener(
         "canplay",
         handleCanPlay,
-        { once: true }
+        {
+          once: true,
+        }
       );
 
       audio.addEventListener(
         "loadedmetadata",
         handleLoadedMetadata,
-        { once: true }
+        {
+          once: true,
+        }
       );
     }
 
@@ -772,16 +770,6 @@ export function MusicPlayerProvider({
         "loadedmetadata",
         handleLoadedMetadata
       );
-
-      /*
-       * IMPORTANT:
-       *
-       * We intentionally DO NOT pause
-       * the audio here.
-       *
-       * The provider should remain mounted
-       * while navigating between pages.
-       */
     };
   }, [
     currentSong?.id,
@@ -795,21 +783,26 @@ export function MusicPlayerProvider({
    */
 
   useEffect(() => {
-    if (!currentSong) return;
+    if (!currentSong) {
+      return;
+    }
 
     const interval =
-      window.setInterval(() => {
-        const audio =
-          audioRef.current;
+      window.setInterval(
+        () => {
+          const audio =
+            audioRef.current;
 
-        savePlayerState(
-          currentSong,
-          audio?.currentTime ??
-            currentTime,
-          isPlaying,
-          volume
-        );
-      }, 1000);
+          savePlayerState(
+            currentSong,
+            audio?.currentTime ??
+              currentTime,
+            isPlaying,
+            volume
+          );
+        },
+        1000
+      );
 
     return () => {
       window.clearInterval(
@@ -868,12 +861,68 @@ export function MusicPlayerProvider({
    * =========================================
    */
 
-  useEffect(() => {
+  function setVolume(
+    volumeValue: number
+  ) {
+    const safeVolume =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          volumeValue
+        )
+      );
+
+    setVolumeState(
+      safeVolume
+    );
+
     if (audioRef.current) {
       audioRef.current.volume =
-        volume;
+        safeVolume;
     }
-  }, [volume]);
+
+    if (currentSong) {
+      savePlayerState(
+        currentSong,
+        audioRef.current
+          ?.currentTime ??
+          currentTime,
+        isPlaying,
+        safeVolume
+      );
+    }
+  }
+
+  /*
+   * =========================================
+   * CHANGE VOLUME
+   * =========================================
+   *
+   * GlobalMusicPlayer uses changeVolume().
+   * It internally uses the existing setVolume()
+   * implementation.
+   */
+
+  function changeVolume(
+    value: number
+  ) {
+    setVolume(value);
+  }
+
+  /*
+   * =========================================
+   * MUTE
+   * =========================================
+   */
+
+  function toggleMute() {
+    if (volume > 0) {
+      setVolume(0);
+    } else {
+      setVolume(0.8);
+    }
+  }
 
   /*
    * =========================================
@@ -920,7 +969,10 @@ export function MusicPlayerProvider({
         HTMLMediaElement.HAVE_FUTURE_DATA
       ) {
         await new Promise<void>(
-          (resolve, reject) => {
+          (
+            resolve,
+            reject
+          ) => {
             let finished = false;
 
             const cleanup =
@@ -938,7 +990,9 @@ export function MusicPlayerProvider({
 
             const handleCanPlay =
               () => {
-                if (finished) return;
+                if (finished) {
+                  return;
+                }
 
                 finished = true;
 
@@ -949,7 +1003,9 @@ export function MusicPlayerProvider({
 
             const handleError =
               () => {
-                if (finished) return;
+                if (finished) {
+                  return;
+                }
 
                 finished = true;
 
@@ -1042,10 +1098,6 @@ export function MusicPlayerProvider({
       return;
     }
 
-    /*
-     * Same song:
-     * just toggle play/pause.
-     */
     if (
       selectedSong.id ===
       currentSongId
@@ -1076,9 +1128,6 @@ export function MusicPlayerProvider({
     setCurrentTime(0);
     setDuration(0);
 
-    /*
-     * Store SONG ID, not only index.
-     */
     setCurrentSongId(
       selectedSong.id
     );
@@ -1091,7 +1140,9 @@ export function MusicPlayerProvider({
    */
 
   function previousSong() {
-    if (!songs.length) return;
+    if (!songs.length) {
+      return;
+    }
 
     shouldPlayRef.current =
       true;
@@ -1100,7 +1151,8 @@ export function MusicPlayerProvider({
       (currentId) => {
         if (!currentId) {
           return (
-            songs[0]?.id ?? null
+            songs[0]?.id ??
+            null
           );
         }
 
@@ -1115,7 +1167,8 @@ export function MusicPlayerProvider({
           return (
             songs[
               songs.length - 1
-            ]?.id ?? null
+            ]?.id ??
+            null
           );
         }
 
@@ -1135,7 +1188,9 @@ export function MusicPlayerProvider({
    */
 
   function nextSong() {
-    if (!songs.length) return;
+    if (!songs.length) {
+      return;
+    }
 
     shouldPlayRef.current =
       true;
@@ -1144,7 +1199,8 @@ export function MusicPlayerProvider({
       (currentId) => {
         if (!currentId) {
           return (
-            songs[0]?.id ?? null
+            songs[0]?.id ??
+            null
           );
         }
 
@@ -1161,7 +1217,8 @@ export function MusicPlayerProvider({
             songs.length - 1
         ) {
           return (
-            songs[0]?.id ?? null
+            songs[0]?.id ??
+            null
           );
         }
 
@@ -1223,42 +1280,9 @@ export function MusicPlayerProvider({
 
   /*
    * =========================================
-   * SET VOLUME
+   * PROVIDER
    * =========================================
    */
-
-  function setVolume(
-    volumeValue: number
-  ) {
-    const safeVolume =
-      Math.max(
-        0,
-        Math.min(
-          1,
-          volumeValue
-        )
-      );
-
-    setVolumeState(
-      safeVolume
-    );
-
-    if (audioRef.current) {
-      audioRef.current.volume =
-        safeVolume;
-    }
-
-    if (currentSong) {
-      savePlayerState(
-        currentSong,
-        audioRef.current
-          ?.currentTime ??
-          currentTime,
-        isPlaying,
-        safeVolume
-      );
-    }
-  }
 
   return (
     <MusicPlayerContext.Provider
@@ -1277,16 +1301,12 @@ export function MusicPlayerProvider({
         previousSong,
         nextSong,
         seekSong,
+
         setVolume,
+        changeVolume,
+        toggleMute,
       }}
     >
-      {/*
-       * THIS IS THE ONLY AUDIO ELEMENT
-       * IN THE WHOLE APP.
-       *
-       * It belongs to the provider,
-       * not to All Songs page.
-       */}
       <audio
         ref={audioRef}
         preload="metadata"
