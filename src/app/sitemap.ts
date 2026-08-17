@@ -1,26 +1,35 @@
 import type { MetadataRoute } from "next";
 
-const BASE_URL = "https://music-flow-yb69.vercel.app";
-
 export default function sitemap(): MetadataRoute.Sitemap {
+  const baseUrl = "https://music-flow-yb69.vercel.app";
+
+  const categories = [
+    "rajasthani",
+    "punjabi",
+    "haryanvi",
+    "90s",
+  ];
+
   return [
     {
-      url: BASE_URL,
+      url: baseUrl,
       lastModified: new Date(),
       changeFrequency: "daily",
       priority: 1,
     },
+
     {
-      url: `${BASE_URL}/all-songs`,
+      url: `${baseUrl}/all-songs`,
       lastModified: new Date(),
       changeFrequency: "daily",
       priority: 0.9,
     },
-    {
-      url: `${BASE_URL}/category`,
+
+    ...categories.map((category) => ({
+      url: `${baseUrl}/category/${category}`,
       lastModified: new Date(),
-      changeFrequency: "daily",
+      changeFrequency: "daily" as const,
       priority: 0.8,
-    },
+    })),
   ];
 }
